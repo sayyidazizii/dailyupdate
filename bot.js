@@ -4,7 +4,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const git = simpleGit();
-const logBuffer = []; // buffer log ditulis di akhir
+const logBuffer = [];
 
 const LOCK_FILE = path.join(__dirname, '.bot-lock');
 const MAX_LOCK_AGE = 5 * 60 * 1000; // 5 minutes
@@ -53,15 +53,26 @@ function flushLog() {
     logBuffer.length = 0;
 }
 
-const commitMessages = [ /* daftar pesan commit */ "💫 Daily workflow commit", "📈 Performance tracking" ];
-const activityTypes = [ "feature development", "bug fixing", "deployment preparation" ];
+const commitMessages = [
+    "💫 Daily workflow commit", "📈 Performance tracking",
+    "📝 Daily activity update", "🎯 Daily milestone update",
+    "✨ Fresh daily changes", "🛠️ Routine optimization",
+    "💡 Daily insights update", "🚧 Work in progress sync"
+];
+
+const activityTypes = [
+    "feature development", "bug fixing", "deployment preparation",
+    "performance optimization", "documentation update"
+];
 
 function getRandomCommitMessage() {
     return commitMessages[Math.floor(Math.random() * commitMessages.length)];
 }
+
 function getRandomActivity() {
     return activityTypes[Math.floor(Math.random() * activityTypes.length)];
 }
+
 function generateBranchName(activity) {
     return `auto/${activity.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
 }
@@ -191,16 +202,24 @@ async function makeCommit() {
         addLog(`🌿 Created and switched to branch: ${branchName}`, 'BRANCH');
 
         const filePath = path.join(__dirname, 'daily_update.txt');
+        const trackingPath = path.join(__dirname, 'commit_tracking.json');
         fs.appendFileSync(filePath, `Activity: ${activity}\n`);
+
         ['🔍 Analyzing requirements', '⚡ Implementing solution', '🧪 Running tests'].forEach(msg => {
-            if (Math.random() > 0.5) addLog(msg, 'PROGRESS');
+            if (Math.random() > 0.4) addLog(msg, 'PROGRESS');
         });
 
-        await git.add(filePath);
+        await git.add([filePath, trackingPath]);
         await git.commit(commitMessage);
         addLog(`✅ Commit successful: ${commitMessage}`, 'COMMIT');
+
         await git.push('origin', branchName);
         addLog(`🚀 Branch pushed to remote: ${branchName}`, 'PUSH');
+
+        // Tambahan commit khusus agar merge sukses
+        await git.add([filePath, trackingPath]);
+        await git.commit('🛠️ Finalizing daily update state (pre-merge)');
+        await git.push('origin', branchName);
 
         const prTitle = `[Auto] ${commitMessage}`;
         const prBody = `Automated PR for ${activity}`;
@@ -262,7 +281,6 @@ async function attemptManualMerge(branchName) {
         await git.push('origin', 'main');
         addLog('✅ Changes pushed successfully', 'PUSH');
         await cleanupBranch(branchName);
-
     } catch (err) {
         addLog(`❌ Manual merge failed: ${err.message}`, 'ERROR');
         await cleanupBranch(branchName);
