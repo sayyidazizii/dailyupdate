@@ -341,42 +341,32 @@ async function attemptAutoMerge(prNum, branchName) {
 
 async function attemptManualMerge(branchName) {
     try {
-        // Get current branch first
         const currentBranch = await git.revparse(['--abbrev-ref', 'HEAD']);
         addLog(`📍 Currently on branch: ${currentBranch}`, 'BRANCH');
-        
-        // If we're not on main, switch to main first
+
+        // Jika tidak di main, stash & checkout main dulu
         if (currentBranch !== 'main') {
-            // Commit any uncommitted changes on current branch first
-            try {
-                const status = await git.status();
-                if (!status.isClean()) {
-                    await git.add('.');
-                    await git.commit('Temporary commit for manual merge');
-                    addLog('📦 Committed pending changes', 'COMMIT');
-                }
-            } catch (commitErr) {
-                addLog(`⚠️ Failed to commit pending changes: ${commitErr.message}`, 'WARNING');
+            const status = await git.status();
+            if (!status.isClean()) {
+                await git.stash(['--include-untracked']);
+                addLog('📦 Stashed changes before switching to main', 'STASH');
             }
-            
+
             await git.checkout('main');
             addLog('🔄 Switched to main branch', 'BRANCH');
         }
-        
-        // Sync with remote
+
         await syncWithRemote();
-        
-        // Merge the branch
+
         await git.merge([branchName]);
         addLog('🔄 Manual merge completed', 'CLEANUP');
-        
-        // Push to main (we're already on main)
+
         let pushSuccess = false;
         for (let i = 0; i < 3; i++) {
             try {
                 await git.push('origin', 'main');
                 pushSuccess = true;
-                addLog('� Changes pushed successfully', 'PUSH');
+                addLog('✅ Changes pushed successfully', 'PUSH');
                 break;
             } catch (pushError) {
                 addLog(`⚠️ Push attempt ${i + 1} failed: ${pushError.message}`, 'WARNING');
@@ -386,19 +376,19 @@ async function attemptManualMerge(branchName) {
                 }
             }
         }
-        
+
         if (!pushSuccess) {
             addLog('❌ All push attempts failed', 'ERROR');
         }
-        
-        // Clean up local branch
+
         await cleanupBranch(branchName);
-        
+
     } catch (manualMergeErr) {
         addLog(`❌ Manual merge failed: ${manualMergeErr.message}`, 'ERROR');
         await cleanupBranch(branchName);
     }
 }
+
 
 async function cleanupBranch(branchName) {
     try {
@@ -421,6 +411,36 @@ async function cleanupBranch(branchName) {
         addLog(`⚠️ Cleanup failed: ${cleanupErr.message}`, 'WARNING');
     }
 }
+
+async function cleanupBranch(branchName) {
+    try {
+        const currentBranch = await git.revparse(['--abbrev-ref', 'HEAD']);
+        if (currentBranch !== 'main') {
+            const status = await git.status();
+            if (!status.isClean()) {
+                await git.stash(['--include-untracked']);
+                addLog('📦 Stashed changes before returning to main', 'STASH');
+            }
+
+            await git.checkout('main');
+            addLog('🔄 Switched back to main branch', 'BRANCH');
+        }
+
+        try {
+            await git.deleteLocalBranch(branchName, true);
+            addLog(`🧹 Cleaned up local branch: ${branchName}`, 'CLEANUP');
+        } catch (deleteErr) {
+            addLog(`⚠️ Could not delete branch ${branchName}: ${deleteErr.message}`, 'WARNING');
+        }
+
+        await safeStashPop();
+
+    } catch (cleanupErr) {
+        addLog(`⚠️ Cleanup failed: ${cleanupErr.message}`, 'WARNING');
+    }
+}
+
+
 
 if (!process.env.GITHUB_TOKEN  && !process.env.GH_TOKEN) {
     console.error('❌ Error: GITHUB_TOKEN or GH_TOKEN environment variable not set');
