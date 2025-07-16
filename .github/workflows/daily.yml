@@ -71,4 +71,4 @@ jobs:
     - name: 🚀 Run Smart Commit Bot
       run: node bot.js
       env:
-        GH_TOKEN: ${{ secrets._TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
