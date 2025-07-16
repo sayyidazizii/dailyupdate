@@ -422,8 +422,8 @@ async function cleanupBranch(branchName) {
     }
 }
 
-if (!process.env._TOKEN && !process.env._TOKEN) {
-    console.error('❌ Error: _TOKEN or GH_TOKEN environment variable not set');
+if (!process.env.GITHUB_TOKEN  && !process.env.GH_TOKEN) {
+    console.error('❌ Error: GITHUB_TOKEN or GH_TOKEN environment variable not set');
     process.exit(1);
 }
 
