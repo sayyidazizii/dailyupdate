@@ -246,6 +246,9 @@ async function makeCommit() {
 
         // Ensure we're on main (should already be in GitHub Actions)
         if (currentBranch !== 'main') {
+            await git.add('.');
+            await git.commit('Temporary commit for manual merge');
+            addLog('📦 Committed pending changes', 'COMMIT');
             await git.checkout('main');
             addLog('🔄 Switched to main branch', 'BRANCH');
         }
@@ -355,7 +358,10 @@ async function attemptManualMerge(branchName) {
             } catch (commitErr) {
                 addLog(`⚠️ Failed to commit pending changes: ${commitErr.message}`, 'WARNING');
             }
-            
+
+            await git.add('.');
+            await git.commit('Temporary commit for manual merge');
+            addLog('📦 Committed pending changes', 'COMMIT');
             await git.checkout('main');
             addLog('🔄 Switched to main branch', 'BRANCH');
         }
@@ -407,7 +413,9 @@ async function cleanupBranch(branchName) {
                 await git.commit('Temp commit during cleanup');
                 addLog('📦 Cleanup commit saved pending changes', 'COMMIT');
             }
-
+            await git.add('.');
+            await git.commit('Temporary commit for manual merge');
+            addLog('📦 Committed pending changes', 'COMMIT');
             await git.checkout('main');
             addLog('🔄 Switched to main branch', 'BRANCH');
         }
