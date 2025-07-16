@@ -181,25 +181,22 @@ async function syncWithRemote() {
 
 async function safeStashAndCheckout(targetBranch) {
     try {
-        // In GitHub Actions, workspace is clean, so minimal stashing needed
-        if (process.env.GITHUB_ACTIONS) {
-            await git.checkout(targetBranch);
-            addLog(`🔄 Switched to branch: ${targetBranch}`, 'BRANCH');
-        } else {
-            // Stash everything including untracked files for local runs
-            await git.stash(['--include-untracked']);
-            addLog('📦 Stashed all changes', 'STASH');
-            
-            await git.checkout(targetBranch);
-            addLog(`🔄 Switched to branch: ${targetBranch}`, 'BRANCH');
+        const status = await git.status();
+        if (!status.isClean()) {
+            await git.add('.');
+            await git.commit('Temporary commit before switching branch');
+            addLog('📦 Committed changes before switching branch', 'COMMIT');
         }
-        
+
+        await git.checkout(targetBranch);
+        addLog(`🔄 Switched to branch: ${targetBranch}`, 'BRANCH');
         return true;
     } catch (error) {
         addLog(`❌ Failed to switch to ${targetBranch}: ${error.message}`, 'ERROR');
         return false;
     }
 }
+
 
 async function safeStashPop() {
     try {
@@ -404,9 +401,17 @@ async function cleanupBranch(branchName) {
     try {
         const currentBranch = await git.revparse(['--abbrev-ref', 'HEAD']);
         if (currentBranch !== 'main') {
-            await safeStashAndCheckout('main');
+            const status = await git.status();
+            if (!status.isClean()) {
+                await git.add('.');
+                await git.commit('Temp commit during cleanup');
+                addLog('📦 Cleanup commit saved pending changes', 'COMMIT');
+            }
+
+            await git.checkout('main');
+            addLog('🔄 Switched to main branch', 'BRANCH');
         }
-        
+
         // Delete local branch if exists
         try {
             await git.deleteLocalBranch(branchName);
@@ -414,9 +419,9 @@ async function cleanupBranch(branchName) {
         } catch (deleteErr) {
             // Branch might not exist, ignore
         }
-        
+
         await safeStashPop();
-        
+
     } catch (cleanupErr) {
         addLog(`⚠️ Cleanup failed: ${cleanupErr.message}`, 'WARNING');
     }
