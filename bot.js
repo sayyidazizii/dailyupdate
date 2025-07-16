@@ -181,25 +181,22 @@ async function syncWithRemote() {
 
 async function safeStashAndCheckout(targetBranch) {
     try {
-        // In GitHub Actions, workspace is clean, so minimal stashing needed
-        if (process.env.GITHUB_ACTIONS) {
-            await git.checkout(targetBranch);
-            addLog(`🔄 Switched to branch: ${targetBranch}`, 'BRANCH');
-        } else {
-            // Stash everything including untracked files for local runs
+        const status = await git.status();
+        if (!status.isClean()) {
             await git.stash(['--include-untracked']);
-            addLog('📦 Stashed all changes', 'STASH');
-            
-            await git.checkout(targetBranch);
-            addLog(`🔄 Switched to branch: ${targetBranch}`, 'BRANCH');
+            addLog('📦 Stashed changes before switching branch', 'STASH');
         }
-        
+
+        await git.checkout(targetBranch);
+        addLog(`🔄 Switched to branch: ${targetBranch}`, 'BRANCH');
+
         return true;
     } catch (error) {
         addLog(`❌ Failed to switch to ${targetBranch}: ${error.message}`, 'ERROR');
         return false;
     }
 }
+
 
 async function safeStashPop() {
     try {
@@ -344,16 +341,10 @@ async function attemptManualMerge(branchName) {
         const currentBranch = await git.revparse(['--abbrev-ref', 'HEAD']);
         addLog(`📍 Currently on branch: ${currentBranch}`, 'BRANCH');
 
-        // Jika tidak di main, stash & checkout main dulu
-        if (currentBranch !== 'main') {
-            const status = await git.status();
-            if (!status.isClean()) {
-                await git.stash(['--include-untracked']);
-                addLog('📦 Stashed changes before switching to main', 'STASH');
-            }
-
-            await git.checkout('main');
-            addLog('🔄 Switched to main branch', 'BRANCH');
+        const switched = await safeStashAndCheckout('main');
+        if (!switched) {
+            addLog(`❌ Could not switch to main for manual merge`, 'ERROR');
+            return;
         }
 
         await syncWithRemote();
@@ -361,25 +352,8 @@ async function attemptManualMerge(branchName) {
         await git.merge([branchName]);
         addLog('🔄 Manual merge completed', 'CLEANUP');
 
-        let pushSuccess = false;
-        for (let i = 0; i < 3; i++) {
-            try {
-                await git.push('origin', 'main');
-                pushSuccess = true;
-                addLog('✅ Changes pushed successfully', 'PUSH');
-                break;
-            } catch (pushError) {
-                addLog(`⚠️ Push attempt ${i + 1} failed: ${pushError.message}`, 'WARNING');
-                if (i < 2) {
-                    await syncWithRemote();
-                    await git.merge([branchName]);
-                }
-            }
-        }
-
-        if (!pushSuccess) {
-            addLog('❌ All push attempts failed', 'ERROR');
-        }
+        await git.push('origin', 'main');
+        addLog('✅ Changes pushed successfully', 'PUSH');
 
         await cleanupBranch(branchName);
 
@@ -390,27 +364,28 @@ async function attemptManualMerge(branchName) {
 }
 
 
+
 async function cleanupBranch(branchName) {
     try {
         const currentBranch = await git.revparse(['--abbrev-ref', 'HEAD']);
         if (currentBranch !== 'main') {
             await safeStashAndCheckout('main');
         }
-        
-        // Delete local branch if exists
+
         try {
-            await git.deleteLocalBranch(branchName);
+            await git.deleteLocalBranch(branchName, true);
             addLog(`🧹 Cleaned up local branch: ${branchName}`, 'CLEANUP');
         } catch (deleteErr) {
-            // Branch might not exist, ignore
+            addLog(`⚠️ Could not delete branch ${branchName}: ${deleteErr.message}`, 'WARNING');
         }
-        
+
         await safeStashPop();
-        
+
     } catch (cleanupErr) {
         addLog(`⚠️ Cleanup failed: ${cleanupErr.message}`, 'WARNING');
     }
 }
+
 
 async function cleanupBranch(branchName) {
     try {
