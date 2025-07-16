@@ -120,7 +120,7 @@ function shouldCommitNow() {
         fs.appendFileSync(filePath, `\n🌅 === NEW DAY: ${timestamp} === Target: ${tracking.targetCommits} commits ===\n\n`);
     }
 
-    const shouldCommit = tracking.count < tracking.targetCommits && Math.random() > 0.3;
+    const shouldCommit = tracking.count < tracking.targetCommits;
 
     if (shouldCommit) {
         tracking.count += 1;
