@@ -182,9 +182,16 @@ async function syncWithRemote() {
 async function safeStashAndCheckout(targetBranch) {
     try {
         const status = await git.status();
-        if (!status.isClean()) {
+
+        // Tambahan keamanan: lakukan stash jika ada modified OR untracked files
+        const hasChanges = status.files.length > 0;
+
+        if (hasChanges) {
             await git.stash(['--include-untracked']);
             addLog('📦 Stashed changes before switching branch', 'STASH');
+
+            // Delay kecil agar stash tersimpan dengan baik
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
         await git.checkout(targetBranch);
