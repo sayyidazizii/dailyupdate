@@ -126,7 +126,10 @@ function shouldCommitNow() {
         tracking.count += 1;
     }
 
+    console.log('📍 trackingFile:', trackingFile);
+    console.log('📝 tracking sebelum ditulis:', tracking);
     fs.writeFileSync(trackingFile, JSON.stringify(tracking, null, 2));
+    console.log('✅ tracking setelah ditulis!');
 
     console.log(`Today's progress: ${tracking.count}/${tracking.targetCommits} commits`);
     return shouldCommit;
