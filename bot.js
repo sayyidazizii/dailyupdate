@@ -130,6 +130,11 @@ function shouldCommitNow() {
     console.log('📝 tracking sebelum ditulis:', tracking);
     fs.writeFileSync(trackingFile, JSON.stringify(tracking, null, 2));
     console.log('✅ tracking setelah ditulis!');
+    
+    execSafeSync(`git add commit_tracking.json`);
+    execSafeSync(`git commit -m "📊 Update tracking progress"`);
+    execSafeSync(`git push`);
+
 
     console.log(`Today's progress: ${tracking.count}/${tracking.targetCommits} commits`);
     return shouldCommit;
@@ -327,7 +332,15 @@ async function attemptAutoMerge(prNum, branchName) {
     try {
         // Wait a bit for PR to be ready
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
+
+        // Commit any uncommitted changes BEFORE gh pr merge
+        const status = await git.status();
+        if (!status.isClean()) {
+            await git.add('.');
+            await git.commit('Temp commit before auto-merge');
+            addLog('📦 Committed local changes before attempting auto-merge', 'COMMIT');
+        }
+
         const mergeResult = execSafeSync(`gh pr merge ${prNum} --merge --delete-branch`);
 
         if (mergeResult.success) {
@@ -341,6 +354,7 @@ async function attemptAutoMerge(prNum, branchName) {
         await cleanupBranch(branchName);
     }
 }
+
 
 async function attemptManualMerge(branchName) {
     try {
